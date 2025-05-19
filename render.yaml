@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: currency-bot
     env: python
     plan: free
@@ -7,9 +7,11 @@ services:
     startCommand: "python bot.py"
     envVars:
       - key: TELEGRAM_BOT_TOKEN
-        value: 8145509404:AAH9N6opjzM9sO0oahC2jyI_-56SOitKYeg
+        value: 7bfff3cb36b3d3b819ab4304
       - key: OPENAI_API_KEY
         value: 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
       - key: EXCHANGE_API_KEY
-        value: 7bfff3cb36b3d3b819ab4304
+        value: 8145509404:AAH9N6opjzM9sO0oahC2jyI_-56SOitKYeg
+      - key: WEBHOOK_URL
+        value: https://your-service-name.onrender.com
 
