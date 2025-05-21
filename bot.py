@@ -2,10 +2,10 @@ import os
 import logging
 from telegram import Update
 from telegram.ext import (
-    ApplicationBuilder, 
-    CommandHandler, 
-    MessageHandler, 
-    ContextTypes, 
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
     filters,
 )
 import openai
@@ -18,16 +18,18 @@ import asyncio
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Full HTTPS URL of your Render web service
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Should be: https://currency-converter-telegram-bot.onrender.com
 
 openai.api_key = OPENAI_API_KEY
 logging.basicConfig(level=logging.INFO)
+
 
 # --- Handlers ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💱 Hi! Just type a message like:\n- Convert 100 USD to INR\n- How much is 50 euros in rupees?\n- 25 yen in usd"
     )
+
 
 def get_conversion(amount, from_currency, to_currency):
     url = f"https://v6.exchangerate-api.com/v6/{EXCHANGE_API_KEY}/latest/{from_currency.upper()}"
@@ -41,12 +43,14 @@ def get_conversion(amount, from_currency, to_currency):
     converted = round(float(amount) * rate, 2)
     return f"{amount} {from_currency.upper()} = {converted} {to_currency.upper()}"
 
+
 def parse_with_regex(text):
     pattern = r"(\d+(?:\.\d+)?)\s*([A-Za-z]{3})\s*(?:to|in)\s*([A-Za-z]{3})"
     match = re.search(pattern, text, re.IGNORECASE)
     if match:
         return float(match.group(1)), match.group(2).upper(), match.group(3).upper()
     return None
+
 
 def parse_with_gpt(message: str):
     prompt = f'''
@@ -70,6 +74,7 @@ If you can't extract, say "None".
     except:
         return None
 
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     parsed = parse_with_regex(text)
@@ -86,6 +91,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❗ Sorry, I couldn't understand that. Try: '100 USD to INR'")
 
+
 # --- Webhook Setup ---
 async def setup_application():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
@@ -96,31 +102,28 @@ async def setup_application():
     await app.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
     return app
 
+
 async def init_webhook(app):
-    # Create web application
     webapp = web.Application()
-    
-    # Set up webhook handler
+
     async def webhook_handler(request):
         data = await request.json()
+        print("Received webhook:", data)  # ✅ For debugging incoming Telegram messages
         update = Update.de_json(data, app.bot)
         await app.process_update(update)
         return web.Response()
-    
-    # Add routes
+
     webapp.add_routes([web.post("/webhook", webhook_handler)])
     return webapp
 
+
 if __name__ == "__main__":
-    # Set up the event loop
     loop = asyncio.get_event_loop()
-    
-    # Create and initialize telegram app
+
     telegram_app = loop.run_until_complete(setup_application())
-    
-    # Create and initialize web app with the telegram app
     web_app = loop.run_until_complete(init_webhook(telegram_app))
-    
-    # Start the web server
-    web.run_app(web_app, port=10000)  # Render expects it to listen on $PORT
+
+    # ✅ Bind to the correct port expected by Render
+    web.run_app(web_app, port=int(os.environ.get("PORT", 10000)))
+
 
