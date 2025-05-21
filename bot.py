@@ -12,6 +12,7 @@ import openai
 import requests
 import re
 from aiohttp import web
+import asyncio
 
 # Setup keys from environment
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -41,7 +42,7 @@ def get_conversion(amount, from_currency, to_currency):
     return f"{amount} {from_currency.upper()} = {converted} {to_currency.upper()}"
 
 def parse_with_regex(text):
-    pattern = r"(\\d+(?:\\.\\d+)?)\\s*([A-Za-z]{3})\\s*(?:to|in)\\s*([A-Za-z]{3})"
+    pattern = r"(\d+(?:\.\d+)?)\s*([A-Za-z]{3})\s*(?:to|in)\s*([A-Za-z]{3})"
     match = re.search(pattern, text, re.IGNORECASE)
     if match:
         return float(match.group(1)), match.group(2).upper(), match.group(3).upper()
@@ -83,27 +84,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = get_conversion(gpt_result["amount"], gpt_result["from"], gpt_result["to"])
         await update.message.reply_text(result)
     else:
-        await update.message.reply_text("❗ Sorry, I couldn’t understand that. Try: '100 USD to INR'")
+        await update.message.reply_text("❗ Sorry, I couldn't understand that. Try: '100 USD to INR'")
 
 # --- Webhook Setup ---
-async def main():
+async def setup_application():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # Set webhook
     await app.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+    return app
 
-    # aiohttp web server
-    async def handler(request):
+async def init_webhook(app):
+    # Create web application
+    webapp = web.Application()
+    
+    # Set up webhook handler
+    async def webhook_handler(request):
         data = await request.json()
         update = Update.de_json(data, app.bot)
         await app.process_update(update)
         return web.Response()
-
-    # Start aiohttp server
-    return web.Application().add_routes([web.post("/webhook", handler)])
+    
+    # Add routes
+    webapp.add_routes([web.post("/webhook", webhook_handler)])
+    return webapp
 
 if __name__ == "__main__":
-    web.run_app(main(), port=10000)  # Render expects it to listen on $PORT (we’ll configure this in render.yaml)
+    # Set up the event loop
+    loop = asyncio.get_event_loop()
+    
+    # Create and initialize telegram app
+    telegram_app = loop.run_until_complete(setup_application())
+    
+    # Create and initialize web app with the telegram app
+    web_app = loop.run_until_complete(init_webhook(telegram_app))
+    
+    # Start the web server
+    web.run_app(web_app, port=10000)  # Render expects it to listen on $PORT
 
