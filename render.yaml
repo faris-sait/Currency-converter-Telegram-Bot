@@ -1,17 +1,17 @@
 services:
   - type: web
-    name: currency-bot
+    name: currency-converter-bot
     env: python
     plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python bot.py"
     envVars:
       - key: TELEGRAM_BOT_TOKEN
-        value: 7bfff3cb36b3d3b819ab4304
-      - key: OPENAI_API_KEY
-        value: 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
+        sync: false
       - key: EXCHANGE_API_KEY
-        value: 8145509404:AAH9N6opjzM9sO0oahC2jyI_-56SOitKYeg
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
       - key: WEBHOOK_URL
-        value: https://currency-converter-telegram-bot.onrender.com
+        sync: false
 
